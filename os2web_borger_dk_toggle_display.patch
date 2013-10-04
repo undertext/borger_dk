@@ -1,0 +1,128 @@
+diff --git a/os2web_borger_dk_articles.module b/os2web_borger_dk_articles.module
+index 75ca5d5..49bfb32 100644
+--- a/os2web_borger_dk_articles.module
++++ b/os2web_borger_dk_articles.module
+@@ -51,9 +51,9 @@ function _os2web_borger_dk_articles_autocomplete_callback($string = '') {
+       ->fields('o', array('ArticleID', 'ArticleStatus', 'ArticleTitle'))
+       ->condition('o.ArticleStatus', 0, '>=')
+       ->condition('o.ArticleTitle', db_like($string) . '%', 'LIKE')
+-      ->range(0, 10);    
++      ->range(0, 10);
+     $result = $query->execute();
+-    
++
+     // Add matches to $matches.
+     foreach ($result as $row) {
+       if ($row->ArticleStatus > 0) {
+@@ -92,6 +92,9 @@ function os2web_borger_dk_articles_form_alter(&$form, &$form_state, $form_id) {
+ 
+         $locked_os2web_types = array('field_os2web_borger_dk_url' => 1);
+         $admin_display_fields = variable_get('os2web_borger_dk_articles_display');
++        if(isset($form['nid']['#value'])){
++          $admin_display_fields =$form_state['node']->borger_dk_article['field_settings'];
++        }
+         $visible_items = (isset($form['#node']->borger_dk_article['field_settings'])) ? $form['#node']->borger_dk_article['field_settings'] : NULL;
+         $data = field_info_instances('node', 'borger_dk_article');
+ 
+@@ -100,9 +103,9 @@ function os2web_borger_dk_articles_form_alter(&$form, &$form_state, $form_id) {
+         $initial_values = array();
+         $data['title'] = array('label' => 'Title');
+         foreach ($data as $type => $item) {
++          $checkbox_opts[$type] = t($item['label']);
+           if ($admin_display_fields[$type]) {
+             // admin-config says we should show this item as an option
+-            $checkbox_opts[$type] = t($item['label']);
+             if (empty($visible_items) || (!empty($visible_items) && !empty($visible_items[$type]))) {
+               //If visible_items is empty that means we should use admin-config
+               //or if the type of visible_items is set, and set to be displayed
+@@ -162,7 +165,7 @@ function os2web_borger_dk_articles_autocomplete_form(&$form, $form_state) {
+     '#title' => t('Import Borger.dk Article'),
+     '#collapsible' => FALSE,
+   );
+- 
++
+   $form['new_borger_dk_article_import']['os2web_borger_dk_article_url_text'] = array(
+     '#type' => 'textfield',
+     '#title' => t('Borger.dk Article URL'),
+@@ -250,8 +253,7 @@ function os2web_borger_dk_articles_after_build($form, &$form_state) {
+   // changed later on (ie. locked).
+   $locked_os2web_types = array('field_os2web_borger_dk_url' => 1);
+   $nid = $form_state['values']['nid'];
+-  $admin_display_fields = variable_get('os2web_borger_dk_articles_display', array(NULL));
+-
++  $admin_display_fields = $form_state['values']['field_settings'];
+   // First we check if this is a node/add-type by checking the node->nid.
+   if (!empty($nid)) {
+     // This is an old node that is being edited.
+@@ -259,7 +261,7 @@ function os2web_borger_dk_articles_after_build($form, &$form_state) {
+     // marked as hidden in the admin-display-settings.
+     foreach ($admin_display_fields as $type => $item) {
+       if (empty($item) && empty($locked_os2web_types[$type])) {
+-        unset($form[$type]);
++        $form[$type]['#access'] = FALSE;
+       }
+     }
+     // Then we must disable all fields that has been marked as
+@@ -870,8 +872,8 @@ function _os2web_borger_dk_articles_titles_cronbatch($first_run = FALSE) {
+       // Before we update we check if it has been changed
+       $updated = strtotime($item['LastUpdated']);
+       if ($updated > $known_ids[$aid]['LastUpdated']) {
+-      // We know about this article and we update the DB-entry
+-      // because the content has changed since we updated it last
++        // We know about this article and we update the DB-entry
++        // because the content has changed since we updated it last
+         db_update('os2web_borger_dk_titles')
+           ->fields(array(
+             'ArticleTitle' => $item['ArticleTitle'],
+@@ -970,7 +972,7 @@ function _borger_dk_article_status_check_queue_callback($data) {
+   if (!isset($data['nid']) || !isset($data['external_id'])) {
+     return;
+   }
+-  
++
+   $wsdl = variable_get('os2web_borger_dk_webservice', 'https://www.borger.dk/_vti_bin/borger/ArticleExport.svc?wsdl');
+   // Try to get this one article, to see if it still exists
+   $item = _os2web_borger_dk_articles_GetArticleByID($data['external_id'], $wsdl);
+@@ -1108,7 +1110,7 @@ function _os2web_borger_dk_articles_GetAllArticles($wsdl = 'https://www.borger.d
+     $errors = _os2web_borger_dk_articles_translate_soap_fault('GetAllArticles', $result_list->faultcode, $result_list->faultstring);
+     return $errors;
+   }
+-    
++
+   $article_items = array();
+   // Then we get the result-list from the specified webservice
+   $article_list = $result_list->GetAllArticlesResult;
+@@ -1563,11 +1565,11 @@ function _os2web_borger_dk_articles_translate_soap_fault($borgerdk_id, $faultcod
+  */
+ function _os2web_borger_dk_articles_check_webservice_constraints() {
+   $time = time();
+-  
++
+   // We start of by getting the webservice request-limits.
+   $webservice_request_limit = variable_get('os2web_borger_dk_webservice_request_limit', 100);
+   $webservice_time_limit = variable_get('os2web_borger_dk_webservice_time_limit', 60);
+-  
++
+   // And we keep track of the number of webservice-requests per timeperiod.
+   $os2web_borger_dk_article_count_no = variable_get('os2web_borger_dk_webservice_request_counter', 0);
+   $os2web_borger_dk_article_start_time = variable_get('os2web_borger_dk_webservice_time_counter', 0);
+@@ -1577,16 +1579,16 @@ function _os2web_borger_dk_articles_check_webservice_constraints() {
+     $os2web_borger_dk_article_count_no = 0;
+     $os2web_borger_dk_article_start_time = $time;
+     variable_set('os2web_borger_dk_webservice_request_counter', $os2web_borger_dk_article_count_no);
+-    variable_set('os2web_borger_dk_webservice_time_counter', $os2web_borger_dk_article_start_time);  
++    variable_set('os2web_borger_dk_webservice_time_counter', $os2web_borger_dk_article_start_time);
+   }
+-  
++
+   // Then we check if the limits has been reached, and it's time for a break.
+   if (($webservice_time_limit >= ($time - $os2web_borger_dk_article_start_time)) &&
+       ($webservice_request_limit <= $os2web_borger_dk_article_count_no)) {
+     // We have reached the work-load limit of 100 items per minute, and must
+     // take a small break or the webservice will stop answering us.
+     sleep($webservice_time_limit - ($time - $os2web_borger_dk_article_start_time));
+-    
++
+     // Then we reset/store the counters for limiting the webservice work-load.
+     $os2web_borger_dk_article_count_no = 0;
+     $os2web_borger_dk_article_start_time = time();
